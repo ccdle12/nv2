@@ -1,4 +1,4 @@
-use aes_gcm::Error as AesGcmError;
+use aes_gcm::Error as AesGcm;
 
 #[derive(Debug)]
 pub enum Error {
@@ -7,13 +7,13 @@ pub enum Error {
     UnsupportedCiphers(Vec<u8>),
     InvalidCipherList(Vec<u8>),
     InvalidCipherChosed(Vec<u8>),
-    AesGcmError(AesGcmError),
+    AesGcm(AesGcm),
     InvalidCipherState,
     InvalidCertificate([u8; 74]),
 }
 
-impl From<AesGcmError> for Error {
-    fn from(value: AesGcmError) -> Self {
-        Self::AesGcmError(value)
+impl From<AesGcm> for Error {
+    fn from(value: AesGcm) -> Self {
+        Self::AesGcm(value)
     }
 }

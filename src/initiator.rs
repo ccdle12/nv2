@@ -5,10 +5,10 @@ use crate::cipher_state::{Cipher, CipherState, GenericCipher};
 use crate::error::Error;
 use crate::handshake::HandshakeOp;
 use crate::{signature_message::SignatureNoiseMessage, NoiseCodec};
-use aes_gcm::{KeyInit, AeadInPlace};
+use aes_gcm::KeyInit;
 use chacha20poly1305::ChaCha20Poly1305;
 use secp256k1::KeyPair;
-use secp256k1::{Secp256k1, XOnlyPublicKey};
+use secp256k1::XOnlyPublicKey;
 
 pub struct Initiator<C: AeadCipher> {
     handshake_cipher: Option<ChaCha20Poly1305>,
@@ -116,9 +116,7 @@ impl<C: AeadCipher> Initiator<C> {
         self.encrypt_and_hash(&mut vec![])?;
 
         let mut message = [0u8; 32];
-        for i in 0..32 {
-            message[i] = serialized[i];
-        }
+        message[..32].copy_from_slice(&serialized[..32]);
         Ok(message)
     }
 
@@ -163,7 +161,7 @@ impl<C: AeadCipher> Initiator<C> {
 
         // 4. calls `MixKey(ECDH(e.private_key, re.public_key))`
         let e_private_key = self.e.secret_bytes();
-        self.mix_key(&Self::ecdh(&e_private_key[..], &remote_pub_key[..])[..]);
+        self.mix_key(&Self::ecdh(&e_private_key[..], remote_pub_key)[..]);
 
         // 5. decrypts next 48 bytes with `DecryptAndHash()` and stores the results as `rs.public_key` which is **server's static public key** (note that 32 bytes is the public key and 16 bytes is MAC)
         let mut to_decrypt = message[32..80].to_vec();

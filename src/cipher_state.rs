@@ -1,12 +1,9 @@
 use std::marker::PhantomData;
 use std::ptr;
 
-use crate::{aed_cipher::AeadCipher, error::Error};
+use crate::aed_cipher::AeadCipher;
 use aes_gcm::Aes256Gcm;
-use chacha20poly1305::KeyInit;
 use chacha20poly1305::{aead::Buffer, ChaCha20Poly1305};
-
-const MAX_NONCE: [u8; 12] = [0, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255];
 
 pub trait CipherState<Cipher_: AeadCipher>
 where
@@ -22,21 +19,23 @@ where
         let mut res = [0u8; 12];
         let n = self.get_n();
         let bytes = n.to_le_bytes();
-        for i in 0..bytes.len() {
-            res[1 + 4] = bytes[i];
+        for b in bytes {
+            res[1 + 4] = b;
         }
         res
     }
 
     fn into_aesg(mut self) -> Option<Cipher<Aes256Gcm>> {
+        #[allow(clippy::clone_on_copy)]
         let k = self.get_k().clone()?;
-        let c = Aes256Gcm::from_key(k.into());
+        let c = Aes256Gcm::from_key(k);
         Some(Cipher::from_cipher(c))
     }
 
     fn into_chacha(mut self) -> Option<Cipher<ChaCha20Poly1305>> {
+        #[allow(clippy::clone_on_copy)]
         let k = self.get_k().clone()?;
-        let c = ChaCha20Poly1305::from_key(k.into());
+        let c = ChaCha20Poly1305::from_key(k);
         Some(Cipher::from_cipher(c))
     }
 
@@ -83,9 +82,11 @@ where
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum GenericCipher<A: AeadCipher> {
     ChaCha20Poly1305(Cipher<ChaCha20Poly1305>),
     Aes256Gcm(Cipher<Aes256Gcm>),
+    #[allow(dead_code)]
     Phantom(PhantomData<A>),
 }
 
@@ -135,32 +136,16 @@ impl<C: AeadCipher> GenericCipher<C> {
     pub fn into_aesg(mut self) -> GenericCipher<C> {
         match &mut self {
             GenericCipher::ChaCha20Poly1305(c) => {
-
-                let c = Cipher::from_cipher(Aes256Gcm::from_key(c.get_k().unwrap().into()));
+                let c = Cipher::from_cipher(Aes256Gcm::from_key(c.get_k().unwrap()));
                 self.erase_k();
                 GenericCipher::Aes256Gcm(c)
-
-            },
+            }
             GenericCipher::Aes256Gcm(_) => {
                 self.erase_k();
                 self
             }
             GenericCipher::Phantom(_) => unreachable!(),
         }
-    }
-}
-
-impl GenericCipher<ChaCha20Poly1305> {
-    pub fn new(c: ChaCha20Poly1305) -> Self {
-        let cipher = Cipher::from_cipher(c);
-        Self::ChaCha20Poly1305(cipher)
-    }
-}
-
-impl GenericCipher<Aes256Gcm> {
-    pub fn new(c: Aes256Gcm) -> Self {
-        let cipher = Cipher::from_cipher(c);
-        Self::Aes256Gcm(cipher)
     }
 }
 
@@ -249,18 +234,5 @@ impl<C: AeadCipher> CipherState<C> for Cipher<C> {
 
     fn set_k(&mut self, k: Option<[u8; 32]>) {
         self.k = k;
-    }
-}
-
-impl Cipher<ChaCha20Poly1305> {
-    pub fn into_aesg(mut self) -> Cipher<Aes256Gcm> {
-        let c = match self.k {
-            Some(k) => Aes256Gcm::new(&k.into()),
-            None => unreachable!(),
-        };
-        for b in self.k.as_mut().unwrap() {
-            unsafe { ptr::write_volatile(b, 0) };
-        }
-        Cipher::from_cipher(c)
     }
 }

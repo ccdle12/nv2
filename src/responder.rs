@@ -1,4 +1,3 @@
-use std::pin::Pin;
 use std::ptr;
 
 use crate::aed_cipher::AeadCipher;
@@ -9,10 +8,8 @@ use crate::{signature_message::SignatureNoiseMessage, NoiseCodec};
 use aes_gcm::KeyInit;
 use chacha20poly1305::ChaCha20Poly1305;
 use secp256k1::KeyPair;
-use secp256k1::Secp256k1;
 
 const VERSION: u16 = 0;
-const VALIDITY: u32 = 31449600;
 
 pub struct Responder<C: AeadCipher> {
     handshake_cipher: Option<ChaCha20Poly1305>,
@@ -130,7 +127,11 @@ impl<C: AeadCipher> Responder<C> {
     /// | MAC                     | Message authentication code for SIGNATURE_NOISE_MESSAGE                                                                                                        |
     ///
     /// Message length: 170 bytes
-    pub fn step_1(&mut self, re_pub: [u8; 32]) -> Result<[u8; 170], aes_gcm::Error> {
+    pub fn step_1(
+        &mut self,
+        re_pub: [u8; 32],
+        cert_validity: u32,
+    ) -> Result<[u8; 170], aes_gcm::Error> {
         // 4.5.1.2 Responder
         Self::mix_hash(self, &re_pub[..]);
         Self::decrypt_and_hash(self, &mut vec![])?;
@@ -138,9 +139,7 @@ impl<C: AeadCipher> Responder<C> {
         // 4.5.2.1 Responder
         let mut out = [0; 170];
         let serialized = self.e.x_only_public_key().0.serialize();
-        for i in 0..32 {
-            out[i] = serialized[i];
-        }
+        out[..32].copy_from_slice(&serialized[..32]);
 
         // 3. calls `MixHash(e.public_key)`
         Self::mix_hash(self, &serialized);
@@ -153,13 +152,9 @@ impl<C: AeadCipher> Responder<C> {
         // 5. appends `EncryptAndHash(s.public_key)` (32 bytes encrypted public key, 16 bytes MAC)
         let mut encrypted_static_pub_k = vec![0; 32];
         let static_pub_k = self.s.x_only_public_key().0.serialize();
-        for i in 0..32 {
-            encrypted_static_pub_k[i] = static_pub_k[i];
-        }
+        encrypted_static_pub_k[..32].copy_from_slice(&static_pub_k[..32]);
         self.encrypt_and_hash(&mut encrypted_static_pub_k)?;
-        for i in 0..32 + 16 {
-            out[i + 32] = encrypted_static_pub_k[i];
-        }
+        out[32..(32 + 16 + 32)].copy_from_slice(&encrypted_static_pub_k[..(32 + 16)]);
 
         // 6. calls `MixKey(ECDH(s.private_key, re.public_key))`
         let s_private_key = self.s.secret_bytes();
@@ -171,7 +166,7 @@ impl<C: AeadCipher> Responder<C> {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        let not_valid_after = valid_from as u32 + VALIDITY;
+        let not_valid_after = valid_from as u32 + cert_validity;
         let signature_noise_message =
             self.get_signature(VERSION, valid_from as u32, not_valid_after);
         let mut signature_part = Vec::with_capacity(74 + 16);

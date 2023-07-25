@@ -55,3 +55,6 @@ impl<C: AeadCipher> NoiseCodec<C> {
         self.decryptor.decrypt(msg)
     }
 }
+
+pub use initiator::Initiator;
+pub use responder::Responder;

@@ -36,7 +36,9 @@ pub trait HandshakeOp<Cipher: AeadCipher>: CipherState<Cipher> {
     }
 
     fn hmac_hash(key: &[u8; 32], data: &[u8]) -> [u8; 32] {
+        #[allow(clippy::identity_op)]
         let mut ipad = [(0 ^ 0x36); 64];
+        #[allow(clippy::identity_op)]
         let mut opad = [(0 ^ 0x5c); 64];
         for i in 0..32 {
             ipad[i] = key[i] ^ 0x36;
@@ -84,6 +86,7 @@ pub trait HandshakeOp<Cipher: AeadCipher>: CipherState<Cipher> {
 
     fn encrypt_and_hash(&mut self, plaintext: &mut Vec<u8>) -> Result<(), aes_gcm::Error> {
         if self.get_k().is_some() {
+            #[allow(clippy::clone_on_copy)]
             let h = self.get_h().clone();
             self.encrypt_with_ad(&h, plaintext)?;
         };
@@ -95,6 +98,7 @@ pub trait HandshakeOp<Cipher: AeadCipher>: CipherState<Cipher> {
     fn decrypt_and_hash(&mut self, ciphertext: &mut Vec<u8>) -> Result<(), aes_gcm::Error> {
         let encrypted = ciphertext.clone();
         if self.get_k().is_some() {
+            #[allow(clippy::clone_on_copy)]
             let h = self.get_h().clone();
             self.decrypt_with_ad(&h, ciphertext)?;
         };
@@ -103,8 +107,8 @@ pub trait HandshakeOp<Cipher: AeadCipher>: CipherState<Cipher> {
     }
 
     fn ecdh(private: &[u8], public: &[u8]) -> [u8; 64] {
-        let private = SecretKey::from_slice(&private).expect("Wrong key");
-        let x_public = XOnlyPublicKey::from_slice(&public).expect("Wrong key");
+        let private = SecretKey::from_slice(private).expect("Wrong key");
+        let x_public = XOnlyPublicKey::from_slice(public).expect("Wrong key");
         shared_secret_point(&x_public.public_key(crate::PARITY), &private)
     }
 
@@ -136,8 +140,8 @@ pub trait HandshakeOp<Cipher: AeadCipher>: CipherState<Cipher> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use quickcheck_macros;
     use quickcheck::{Arbitrary, TestResult};
+    use quickcheck_macros;
 
     struct TestHandShake {
         k: Option<[u8; 32]>,
@@ -145,7 +149,6 @@ mod test {
         cipher: Option<ChaCha20Poly1305>,
         h: [u8; 32],
         ck: [u8; 32],
-
     }
 
     impl TestHandShake {
@@ -217,8 +220,8 @@ mod test {
         cipher_1.initialize_key([0; 32]);
         cipher_2.initialize_key([0; 32]);
 
-        let ad = [1,2,3];
-        let data = vec![1,7,92,3,4,5];
+        let ad = [1, 2, 3];
+        let data = vec![1, 7, 92, 3, 4, 5];
 
         let mut encrypted = data.clone();
         cipher_1.encrypt_with_ad(&ad, &mut encrypted).unwrap();
@@ -226,13 +229,12 @@ mod test {
         cipher_2.decrypt_with_ad(&ad, &mut encrypted).unwrap();
 
         assert!(encrypted == data);
-
     }
 
     #[test]
     fn test_hmac_hash_with_0s() {
         let k = [0; 32];
-        let data = [0;90];
+        let data = [0; 90];
         let value = TestHandShake::hmac_hash(&k, &data);
 
         // xor padded key with repeted 0x36
@@ -240,22 +242,22 @@ mod test {
         let mut to_hash = vec![];
         for b in xored {
             to_hash.push(b);
-        };
+        }
         for b in data {
             to_hash.push(b);
-        };
+        }
         let temp = Sha256Hash::hash(&to_hash).to_byte_array();
         // xor padded key with repeted 0x5x 01011100
         let xored = [0x5c; 64];
         let mut to_hash = vec![];
         for b in xored {
             to_hash.push(b);
-        };
+        }
         for b in temp {
             to_hash.push(b);
-        };
+        }
         let expected = Sha256Hash::hash(&to_hash).to_byte_array();
-            
+
         assert!(value == expected);
     }
 
@@ -271,7 +273,7 @@ mod test {
         let (out_1, out_2) = TestHandShake::hkdf_2(&chaining_key, &input_key_material);
         assert!(out_1 == expected_1);
         assert!(out_2 == expected_2);
-    } 
+    }
 
     #[test]
     fn test_mix_key() {
@@ -314,8 +316,8 @@ mod test {
         cipher_1.set_h([0; 32]);
         cipher_2.set_h([0; 32]);
 
-        let data = vec![1,7,92,3,4,5];
-        
+        let data = vec![1, 7, 92, 3, 4, 5];
+
         let mut encrypted = data.clone();
         cipher_1.encrypt_and_hash(&mut encrypted).unwrap();
         assert!(encrypted != data);
@@ -324,7 +326,6 @@ mod test {
 
         assert!(encrypted == data);
         assert!(cipher_1.get_h() == cipher_2.get_h());
-
     }
 
     #[test]
@@ -360,7 +361,7 @@ mod test {
                 secret.truncate(32);
             }
             assert!(secret.len() == 32);
-            let secret: [u8;32] = secret.try_into().unwrap();
+            let secret: [u8; 32] = secret.try_into().unwrap();
             match SecretKey::from_slice(&secret) {
                 Ok(secret) => KeyPairWrapper(Some(KeyPair::from_secret_key(&secp, &secret))),
                 Err(_) => KeyPairWrapper(None),
@@ -370,11 +371,12 @@ mod test {
 
     #[quickcheck_macros::quickcheck]
     fn test_ecdh_1(kp1: KeyPairWrapper, kp2: KeyPairWrapper) -> TestResult {
-        let (kp1,kp2) = match (kp1.0, kp2.0) {
+        let (kp1, kp2) = match (kp1.0, kp2.0) {
             (Some(kp1), Some(kp2)) => (kp1, kp2),
             _ => return TestResult::discard(),
         };
-        if kp1.x_only_public_key().1 == crate::PARITY && kp2.x_only_public_key().1 == crate::PARITY {
+        if kp1.x_only_public_key().1 == crate::PARITY && kp2.x_only_public_key().1 == crate::PARITY
+        {
             let secret_1 = kp1.secret_bytes();
             let secret_2 = kp2.secret_bytes();
 
@@ -393,6 +395,4 @@ mod test {
             TestResult::discard()
         }
     }
-
-
 }

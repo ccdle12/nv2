@@ -4,7 +4,6 @@ use chacha20poly1305::AeadInPlace;
 use chacha20poly1305::ChaCha20Poly1305;
 use chacha20poly1305::ChaChaPoly1305;
 use chacha20poly1305::KeyInit;
-use secp256k1::{All, KeyPair, Secp256k1};
 
 pub trait AeadCipher {
     fn from_key(k: [u8; 32]) -> Self;
@@ -68,9 +67,4 @@ impl AeadCipher for Aes256Gcm {
     ) -> Result<(), aes_gcm::Error> {
         self.decrypt_in_place(nonce.into(), ad, data)
     }
-}
-
-struct Secp256k1Cipher {
-    cipher: Secp256k1<All>,
-    key_pair: KeyPair,
 }

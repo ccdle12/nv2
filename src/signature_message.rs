@@ -1,6 +1,4 @@
-use secp256k1::{
-    hashes::sha256, schnorr::Signature, KeyPair, Message, PublicKey, Secp256k1, XOnlyPublicKey,
-};
+use secp256k1::{hashes::sha256, schnorr::Signature, KeyPair, Message, Secp256k1, XOnlyPublicKey};
 use std::time::SystemTime;
 
 pub struct SignatureNoiseMessage {
@@ -39,7 +37,7 @@ impl SignatureNoiseMessage {
                 Ok(s) => s,
                 _ => return false,
             };
-            secp.verify_schnorr(&s, &m, &pk).is_ok()
+            secp.verify_schnorr(&s, &m, pk).is_ok()
         } else {
             false
         }
@@ -48,10 +46,8 @@ impl SignatureNoiseMessage {
         let secp = Secp256k1::signing_only();
         let m = Message::from_hashed_data::<sha256::Hash>(&msg[0..10]);
         let signature = secp.sign_schnorr(&m, kp);
-        let mut i = 0;
-        for b in signature.as_ref() {
+        for (i, b) in signature.as_ref().iter().enumerate() {
             msg[10 + i] = *b;
-            i += 1;
         }
     }
 
