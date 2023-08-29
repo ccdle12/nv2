@@ -19,8 +19,16 @@ where
         let mut res = [0u8; 12];
         let n = self.get_n();
         let bytes = n.to_le_bytes();
-        for b in bytes {
-            res[1 + 4] = b;
+
+        // TODO CCDLE12: I think was meant to be copying the the 12 bytes from point 5?
+        // for b in bytes {
+            // res[1 + 4] = b;
+        // }
+        // TODO CCDLE12: I don't think this was encoded correctly.
+        // BUT basically leave the first 4 bytes as 0, and then encode the next 8 bytes
+        // as little endian.
+        for i in 4..res.len() {
+            res[i] = bytes[i - 4];
         }
         res
     }
