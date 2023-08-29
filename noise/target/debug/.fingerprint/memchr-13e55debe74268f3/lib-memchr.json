@@ -1,0 +1,1 @@
+{"rustc":8944949112093861063,"features":"[\"alloc\", \"default\", \"std\"]","target":13876443730220172507,"profile":644273664987288228,"path":9764338395233078576,"deps":[],"local":[{"CheckDepInfo":{"dep_info":"debug/.fingerprint/memchr-13e55debe74268f3/dep-lib-memchr"}}],"rustflags":[],"metadata":508135869874479790,"config":2202906307356721367,"compile_kind":0}
