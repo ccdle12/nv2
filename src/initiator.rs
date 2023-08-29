@@ -15,7 +15,7 @@ pub struct Initiator<C: AeadCipher> {
     k: Option<[u8; 32]>,
     n: u64,
     // Chaining key
-    ck: [u8; 32],
+    pub ck: [u8; 32],
     // Handshake hash
     h: [u8; 32],
     // ephemeral keypair
@@ -172,11 +172,13 @@ impl<C: AeadCipher> Initiator<C> {
         // 6. calls `MixKey(ECDH(e.private_key, rs.public_key)`
         self.mix_key(&Self::ecdh(&e_private_key[..], &rs_pub_key[..])[..]);
 
-        let mut to_decrypt = message[80..170].to_vec();
-        self.decrypt_and_hash(&mut to_decrypt)?;
-        let plaintext: [u8; 74] = to_decrypt.try_into().unwrap();
-        let signature_message: SignatureNoiseMessage = plaintext.into();
-        if signature_message.verify(&self.pk) {
+// TODO: Remove signature message logic until implementing in Bitcoin
+        // let mut to_decrypt = message[80..170].to_vec();
+        // self.decrypt_and_hash(&mut to_decrypt)?;
+        // let plaintext: [u8; 74] = to_decrypt.try_into().unwrap();
+        // let signature_message: SignatureNoiseMessage = plaintext.into();
+
+        // if signature_message.verify(&self.pk) {
             let (temp_k1, temp_k2) = Self::hkdf_2(self.get_ck(), &[]);
             let c1 = ChaCha20Poly1305::new(&temp_k1.into());
             let c2 = ChaCha20Poly1305::new(&temp_k2.into());
@@ -188,9 +190,10 @@ impl<C: AeadCipher> Initiator<C> {
             // 47,53,45,41 = AESG
             let supported_ciphers = [1, 0x47, 0x53, 0x45, 0x41];
             Ok(supported_ciphers)
-        } else {
-            Err(Error::InvalidCertificate(plaintext))
-        }
+        // } else {
+            // Err(Error::InvalidCertificate(plaintext))
+        // }
+// TODO: Remove signature message logic until implementing in Bitcoin
     }
 
     /// #### 4.5.5.1 Upgrade to a new AEAD-cipher
