@@ -16,7 +16,7 @@ pub struct Responder<C: AeadCipher> {
     k: Option<[u8; 32]>,
     n: u64,
     // Chaining key
-    ck: [u8; 32],
+    pub ck: [u8; 32],
     // Handshake hash
     h: [u8; 32],
     // ephemeral keypair
@@ -161,26 +161,32 @@ impl<C: AeadCipher> Responder<C> {
         let ecdh = Self::ecdh(&s_private_key[..], &re_pub[..]);
         Self::mix_key(self, &ecdh[..]);
 
+        // TODO: Comment out signature message first for now
         // 7. appends `EncryptAndHash(SIGNATURE_NOISE_MESSAGE)` to the buffer
-        let valid_from = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        let not_valid_after = valid_from as u32 + cert_validity;
-        let signature_noise_message =
-            self.get_signature(VERSION, valid_from as u32, not_valid_after);
-        let mut signature_part = Vec::with_capacity(74 + 16);
-        signature_part.extend_from_slice(&signature_noise_message[..]);
-        Self::encrypt_and_hash(self, &mut signature_part)?;
-        for i in (32 + 48)..(32 + 48 + 74 + 16) {
-            out[i] = signature_part[i - (32 + 48)];
-        }
+        // let valid_from = std::time::SystemTime::now()
+            // .duration_since(std::time::UNIX_EPOCH)
+            // .unwrap()
+            // .as_secs();
+
+        // let not_valid_after = valid_from as u32 + cert_validity;
+        // let signature_noise_message =
+            // self.get_signature(VERSION, valid_from as u32, not_valid_after);
+        // let mut signature_part = Vec::with_capacity(74 + 16);
+        // signature_part.extend_from_slice(&signature_noise_message[..]);
+        // Self::encrypt_and_hash(self, &mut signature_part)?;
+        // for i in (32 + 48)..(32 + 48 + 74 + 16) {
+            // out[i] = signature_part[i - (32 + 48)];
+        // }
+        // TODO: Comment out signature message first.
 
         // 9. return pair of CipherState objects, the first for encrypting transport messages from initiator to responder, and the second for messages in the other direction:
         let ck = Self::get_ck(self);
+
         let (temp_k1, temp_k2) = Self::hkdf_2(ck, &[]);
+
         let c1 = ChaCha20Poly1305::new(&temp_k1.into());
         let c2 = ChaCha20Poly1305::new(&temp_k2.into());
+
         let c1: Cipher<ChaCha20Poly1305> = Cipher::from_key_and_cipher(temp_k1, c1);
         let c2: Cipher<ChaCha20Poly1305> = Cipher::from_key_and_cipher(temp_k2, c2);
         self.c1 = Some(GenericCipher::ChaCha20Poly1305(c1));
@@ -214,6 +220,7 @@ impl<C: AeadCipher> Responder<C> {
                     let mut encryptor = None;
                     std::mem::swap(&mut encryptor, &mut self.c2);
                     let mut decryptor = None;
+
                     std::mem::swap(&mut decryptor, &mut self.c1);
                     let mut encryptor = encryptor.unwrap();
                     let mut decryptor = decryptor.unwrap();
