@@ -3,8 +3,8 @@ use std::net::{TcpListener, TcpStream};
 use noise::{ChaCha20Poly1305, Responder, HandshakeOp, Initiator};
 
 fn main() {
-    run_responder();
-    // run_initiator();
+    // run_responder();
+    run_initiator();
 }
 
 fn run_initiator() {
@@ -13,24 +13,31 @@ fn run_initiator() {
     let mut initiator = Initiator::<ChaCha20Poly1305>::new(key_pair.public_key().into());
     let mut buf = [0; 1024];
 
+    // Send E msg.
     let first_msg = initiator.step_0().unwrap();
     buf[0..32].clone_from_slice(&first_msg);
 
     println!("DEBUG: Sending buffer: {:?}", &buf);
     conn.write(&buf).unwrap();
 
-    // Feed to step 2?
+    // Expect to receive ES msg.
     let mut buf_1 = [0; 1024];
     conn.read(&mut buf_1).unwrap();
     println!("DEBUG: Received ES: {:?}", &buf_1);
     let mut input = [0u8; 170];
     input.copy_from_slice(&buf_1[0..170]);
 
-    // TODO: Not sending back this support algo message.
-    let _ = initiator.step_2(input).unwrap();
-    let mut codec_initiator = initiator.step_4(vec![0x00]).unwrap();
+    // Send optional ciphers.
+    let mut buf_aead_ciphers = [0; 1024];
+    let aead_ciphers = initiator.step_2(input).unwrap();
+    buf_aead_ciphers[0..5].clone_from_slice(&aead_ciphers);
+    conn.write(&buf_aead_ciphers).unwrap();
 
-    // let mut message = "ciao".as_bytes().to_vec();
+    // Expect to receive Cipher Choice.
+    let mut buf_cipher_choice = [0; 1024];
+    conn.read(&mut buf_cipher_choice).unwrap();
+    let mut codec_initiator = initiator.step_4(buf_cipher_choice[0].to_le_bytes().to_vec()).unwrap();
+
     let first_tx_msg = String::from("FOO");
     let bytes = first_tx_msg.as_bytes();
     let mut buff_2 = [0; 1024 - 16];
