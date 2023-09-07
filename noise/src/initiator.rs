@@ -165,20 +165,21 @@ impl<C: AeadCipher> Initiator<C> {
 
         // 5. decrypts next 48 bytes with `DecryptAndHash()` and stores the results as `rs.public_key` which is **server's static public key** (note that 32 bytes is the public key and 16 bytes is MAC)
         let mut to_decrypt = message[32..80].to_vec();
-
         self.decrypt_and_hash(&mut to_decrypt)?;
         let rs_pub_key = to_decrypt;
 
         // 6. calls `MixKey(ECDH(e.private_key, rs.public_key)`
         self.mix_key(&Self::ecdh(&e_private_key[..], &rs_pub_key[..])[..]);
 
-// TODO: Remove signature message logic until implementing in Bitcoin
-        // let mut to_decrypt = message[80..170].to_vec();
-        // self.decrypt_and_hash(&mut to_decrypt)?;
-        // let plaintext: [u8; 74] = to_decrypt.try_into().unwrap();
-        // let signature_message: SignatureNoiseMessage = plaintext.into();
+        let mut to_decrypt = message[80..170].to_vec();
+        self.decrypt_and_hash(&mut to_decrypt)?;
+        let plaintext: [u8; 74] = to_decrypt.try_into().unwrap();
+        let signature_message: SignatureNoiseMessage = plaintext.into();
 
-        // if signature_message.verify(&self.pk) {
+        // TODO 23.09.07 - There was a bug where we weren't using the received x_only pub key
+        // to verify the signature.
+        let rs_pk_xonly = XOnlyPublicKey::from_slice(&rs_pub_key).unwrap();
+        if signature_message.verify(&rs_pk_xonly) {
             let (temp_k1, temp_k2) = Self::hkdf_2(self.get_ck(), &[]);
             let c1 = ChaCha20Poly1305::new(&temp_k1.into());
             let c2 = ChaCha20Poly1305::new(&temp_k2.into());
@@ -190,10 +191,9 @@ impl<C: AeadCipher> Initiator<C> {
             // 47,53,45,41 = AESG
             let supported_ciphers = [1, 0x47, 0x53, 0x45, 0x41];
             Ok(supported_ciphers)
-        // } else {
-            // Err(Error::InvalidCertificate(plaintext))
-        // }
-// TODO: Remove signature message logic until implementing in Bitcoin
+        } else {
+            Err(Error::InvalidCertificate(plaintext))
+        }
     }
 
     /// #### 4.5.5.1 Upgrade to a new AEAD-cipher
